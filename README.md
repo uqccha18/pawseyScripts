@@ -7,7 +7,7 @@ This script is a wrapper generating a slurm script to run multiple jobs in magnu
  It automatically decides the number of array and jobsPerNode to fully use the resources.
  Verion: 0.6
 
-USAGE: runJobs <configFile>
+USAGE: runJobs &ltconfigFile&gt
  -h This help.
  -d Debug mode, only generate the submission script but not submit the job.
  -c Generate a template configFile.
@@ -22,7 +22,7 @@ Advanced options:
 ## submitArray
 <pre>
 Description: This script is a wrapper to wrap around the sbatch job submission. Automatically do batch submission based on the system config limit.
- USAGE: bash ./submitArray.sh <jobSubmitssionOptions> <jobScript>
+ USAGE: bash ./submitArray.sh &ltjobSubmitssionOptions&gt &ltjobScript&gt
  example: bash ./submitArray.sh --array=1-300 mySlurmScript.slm
 </pre> 
 
