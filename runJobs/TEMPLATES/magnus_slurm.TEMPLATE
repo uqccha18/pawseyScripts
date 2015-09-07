@@ -1,0 +1,43 @@
+#!/bin/bash -l
+
+
+# Kenneth Chan, v0.2 (2015-08-16): added _ACCOUNT_
+# Kenneth Chan, v0.101 (2015-04-23): added running the pe job script with -l to allow using module in script
+# Kenneth Chan, v0.1001 (2015-04-14): change export to ALL
+# Kenneth Chan, v0.1 (2015-04-13): This is a slurm template file to be modified by runJobs.sh 
+# Copyright statement: Copyright (c) 2015 Applied Bioinformatics Group, UWA, Perth WA, Australia
+
+
+#SBATCH --job-name=_JOB_NAME_
+#SBATCH --ntasks=24
+#SBATCH --ntasks-per-node=24
+#SBATCH --time=_HR_:00:00
+#SBATCH --partition=workq
+#SBATCH --account=_ACCOUNT_
+
+#SBATCH --output=_OUTPUT_LOG_
+#SBATCH --error=_ERROR_LOG_
+
+#SBATCH --export=ALL 
+
+echo "========================================="
+echo "SLURM_JOB_ID = $SLURM_JOB_ID"
+echo "SLURM_NODELIST = $SLURM_NODELIST"
+if [ ! -z $SLURM_ARRAY_TASK_ID ]; then
+	# running array job
+	echo "SLURM_ARRAY_TASK_ID = $SLURM_ARRAY_TASK_ID"
+
+	maxArrayIndex=_MAX_ARRAY_INDEX_
+	lastArrayNumOfTask=_LAST_NTASK_
+
+	if [ "$maxArrayIndex" -eq "$SLURM_ARRAY_TASK_ID" ]; then
+		aprun -n _LAST_NTASK_ -N _LAST_NTASK_ bash -l _RUN_PE_WRAPPER_ $SLURM_ARRAY_TASK_ID _NUM-OF-TASK_ 
+	else
+		aprun -n _NUM-OF-TASK_ -N _NUM-OF-TASK_ bash -l _RUN_PE_WRAPPER_ $SLURM_ARRAY_TASK_ID _NUM-OF-TASK_ 
+	fi
+
+else
+	aprun -n _NUM-OF-TASK_ -N _NUM-OF-TASK_ bash -l _RUN_PE_WRAPPER_ 
+fi
+echo "========================================="
+

@@ -1,0 +1,100 @@
+#!/bin/bash -l
+
+# Kenneth Chan, v0.4 (2015-08-16): added _IS_CHECK_MEM_ flag
+# Kenneth Chan, v0.30002 (2015-07-01): magnus compute node no longer support squeue command, take off the last min memory usage display
+# Philipp Bayer, v0.30001 (2015-06-19): fixed bug on thisJobID
+# Kenneth Chan, v0.3 (2015-06-11): Added ExitStatus info
+# Kenneth Chan, v0.2 (2015-06-08): Added max memory print before job finished; fix bug for commands containing redirect; use a couple of variables
+# Kenneth Chan, v0.1101 (2015-05-15): Changed memory usage displayed in MB
+# Kenneth Chan, v0.11 (2015-04-30): Added memory usage info in the node
+# Kenneth Chan, v0.101 (2015-04-23): Added the -l option to allow using module
+# Kenneth Chan, v0.1 (2015-04-13): This is a script template file to be modified by runJobs.sh 
+#	Copyright statement: Copyright (c) 2015 Applied Bioinformatics Group, UWA, Perth WA, Australia
+
+
+##### Default settings 
+
+# Start printing out the max memory used if the job is going to end this time, unit in minutes
+MinPrintBeforeDie=2
+# For recording max memory used the job, unit in seconds
+probeInterval=_PROBE_INTERVAL_
+check_mem=_IS_CHECK_MEM_
+
+######################
+
+curArrayIndex='false'
+peIndex="${ALPS_APP_PE}"
+jobIDLabel="${peIndex}"
+
+# is it an array job?
+thisJobID=${SLURM_JOB_ID}
+if [ ! -z $1 ]; then
+	curArrayIndex=$1
+	nTasks=$2
+	jobIDLabel="${curArrayIndex}-${peIndex}"
+	thisJobID="${thisJobID}_${curArrayIndex}"
+fi
+
+
+thisConfig='_CONFIG_FILE_'
+if [ -e $thisConfig ]; then
+	. $thisConfig
+else
+	echo "ERROR in job ${jobIDLabel}: Config file does not exist - $thisConfig" 1>&2; exit 1;
+fi
+
+
+if [ "$curArrayIndex" == "false" ]; then
+	fileIndex=${peIndex};
+else
+	fileIndex=$((${peIndex}+$((${nTasks}*${curArrayIndex}))))
+fi
+
+thisOutDir="_OUT_DIR_/${fileIndex}"
+
+if [ ! -d $thisOutDir ]; then
+	mkdir -p $thisOutDir;
+fi
+
+
+cd $thisOutDir
+echo "`date` Start job ${jobIDLabel}: $PROG ${OPTION_ARG[$fileIndex]}"
+
+
+if [ "$check_mem" == "0" ]; then
+	eval "$PROG ${OPTION_ARG[$fileIndex]}"
+	progExitStatus=$?;
+  echo "`date`: Finish job ${jobIDLabel}, ExitStatus: $progExitStatus"
+else
+  eval "($PROG ${OPTION_ARG[$fileIndex]}) &"
+  thisPID=$!;
+  
+  sys95pcMem=`free -m |sed -n '2p' | awk '{print int ($2*0.95)}'`;
+  maxMem=0
+  while ps -p ${thisPID} > /dev/null
+  do
+  	curmem=`free -m |sed -n '2p' | awk '{print $3}';`
+  	if [ "$maxMem" -lt "$curmem" ]; then maxMem=$curmem; fi
+  	# If the job dies, we will still get some info about the memory usage
+  	if [ "$maxMem" -gt "$sys95pcMem" ]; then
+  		echo "`date`: Reach >95% ($sys95pcMem MB) of sysMem, CurrentMemUsed: $maxMem MB"
+  	fi
+  
+  	# If the job is going to end soon, print out the current memory usage
+  #	timeLeft=`squeue -j ${thisJobID} -o %L | tail -n 1`;
+  #	if [[ "${timeLeft}" =~ ^([0-9][0-9]):[0-9][0-9]$ ]]; then
+  #		curMin=${BASH_REMATCH[1]}
+  #		if [ $curMin -le $MinPrintBeforeDie ]; then
+  #			echo "`date`: $curMin min left, CurrentMemUsed: $maxMem MB"
+  #		fi
+  #	fi
+  
+  	sleep $probeInterval
+  done
+  
+  wait ${thisPID}
+  progExitStatus=$?;
+  
+  echo "`date`: Finish job ${jobIDLabel}, MaxMemUsed: $maxMem MB, ExitStatus: $progExitStatus"
+fi
+

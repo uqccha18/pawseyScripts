@@ -1,0 +1,35 @@
+# Kenneth Chan, v0.2 (2015-06-30): Updated the MEM description to reflect the unit symble in runJobs.sh
+# Kenneth Chan, v0.1 (2015-04-13): This is a configFile template to be modified by runJobs.sh
+# Copyright statement: Copyright (c) 2015 Applied Bioinformatics Group, UWA, Perth WA, Australia
+#
+# Num of cpu for each job
+#  eg. CPU=3
+CPU=
+
+# Amount of memory for each job, in byte or use symble
+#  eg. MEM=1024      # 1 kb for each job
+#  or. MEM=1G      # 1 gb for each job
+MEM=
+
+# Num of hours for each job
+#  eg. HOUR=1
+HOUR=
+
+
+# Job submission script output directory
+# This accept 'absolute path' or 'relative path' relative to this config file
+#  example 1: OUT_DIR='noFilterResult'   # the noFilterResult dir is in a location relative to this config file
+#  example 2: OUT_DIR='/scratch/y82/kchan/proj/noFilterResult'   
+OUT_DIR=
+
+# The fixed part of the run, eg. program/script name and the unchanged options
+#  example 1. PROG='python myscript1.py'
+#  example 2. PROG='python myscript1.py -o /scratch/y82/kchan/testOut'
+PROG=
+
+# The variation part of the run, eg. options and arguments for the program
+#  must be an array, each option needs to be inside a single or double quote
+#    eg. OPTIONS=( '-t fasta -o ./outDir1 inFile1' 
+#                  '-t fastq -o ./outDir2 inFile2' )
+OPTION_ARG=(
+)
