@@ -1,0 +1,14 @@
+#!/bin/bash -l
+
+# Kenneth Chan, v0.1: initial version
+#	Copyright statement: Copyright (c) 2015 Applied Bioinformatics Group, UWA, Perth WA, Australia
+
+#SBATCH --job-name=arrayProb
+#SBATCH --ntasks=24
+#SBATCH --ntasks-per-node=24
+#SBATCH --time=00:10:00
+#SBATCH --partition=debugq
+
+#SBATCH --export=ALL 
+
+submitArray.sh _SCRIPT_
