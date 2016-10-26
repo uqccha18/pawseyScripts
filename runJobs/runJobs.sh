@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-RUNJOB_LATEST_VERSION='0.81'
+RUNJOB_LATEST_VERSION='0.83'
 
 # Kenneth Chan, v0.83 (2016-10-18): Added an optional new config file filename
 # Kenneth Chan, v0.82 (2016-04-13): Set default server to the current server, added -q option
