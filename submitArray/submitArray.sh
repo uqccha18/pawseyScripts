@@ -1,5 +1,8 @@
 #!/bin/bash -l
 
+# Kenneth Chan, v0.4001: Bug fixed
+# Kenneth Chan, v0.4: Handles the max array index limit as well
+# Kenneth Chan, v0.2: Fixed bugs - only check hard code kchan queue; check max resource in current node instead of magnus 
 # Kenneth Chan, v0.1: Initial Version
 # Description: This script is a wrapper to wrap around the sbatch job submission. Automatically do batch submission based on the system config limit.
 # Usage: submitArray.sh <jobSubmissionOptions> <jobScript>
@@ -9,15 +12,7 @@
 # Copyright (c) 2015 Applied Bioinformatics Group, UWA, Perth WA, Australia
 
 
-#################### Default settings ####################
-
-DEBUG=0
-
-#################### End Default settings ####################
-
-
 trap 'exit' ERR
-
 
 usage="\nDescription: This script is a wrapper to wrap around the sbatch job submission. Automatically do batch submission based on the system config limit.\n";
 usage="$usage USAGE: bash $0 <jobSubmitssionOptions> <jobScript>\n";
@@ -31,17 +26,26 @@ fi
 
 
 # Get start, end and script
-## check if ..../.script_nextRun exist, exist - continue input, not exist - first input
+## check if ..../.${scriptName}_nextRun exist, exist - continue input, not exist - first input
 script="${@:$#}";
+
+
 scriptDir="$( cd "$( dirname "${script}" )" && pwd )";
+
 scriptName=$( basename $script )
 scriptNext="${scriptDir}/.${scriptName}_nextRun"
-if [ -f ${scriptDir}/.${scriptName}_nextRun ]; then
+modScript="${scriptDir}/.${scriptName}_tmp"
+
+
+if [ -f ${scriptNext} ]; then
+	# run the next set when there is some left over jobs
 	start=$( sed -n '1p' $scriptNext )
 	end=$( sed -n '2p' $scriptNext )
 	otherOptions=$( sed -n '3p' $scriptNext )
 	script=$( sed -n '4p' $scriptNext )
 else
+	# Initial run
+
   # Collect other1, --array/-a, other2, script
   otherOptions=''
   count=0
@@ -59,22 +63,22 @@ else
   	fi
   done
 
+	# handle non-array job
 	if [ -z "$start" ] || [ -z "$end" ]; then
 		echo "Not an array job request, submit normally:"
 		cmd="sbatch ${otherOptions} ${script}"
 		echo $cmd; eval $cmd
 		exit $?
 	fi
+
 fi
 
 
+# This is an array job and already obtained start, end
 
-max=`scontrol show config |grep 'MaxArraySize\|MaxTasksPerNode'`
+# Notify excessing limit: end>MaxArraySize, 
+max=`scontrol show config -M magnus |grep 'MaxArraySize\|MaxTasksPerNode'`
 maxArraySize=`echo $max | awk '{print $3-1}'`
-# Error if excess limit: end>MaxArraySize, 
-if [ $end -gt $maxArraySize ]; then
-	echo "ERROR: The requested max array size is greater than the system allowable array size: $maxArraySize">&2; exit 1;
-fi
 
 maxTasksPerNode=`echo $max | awk '{print $6}'`
 
@@ -85,7 +89,7 @@ else
 	maxJobNum=$maxTasksPerNode
 fi
 
-numOfJobsInMagnus=$((`squeue -r -u kchan -M magnus -h -o '%i'|wc -l` - 1))
+numOfJobsInMagnus=$((`squeue -r -u $USER -M magnus -h -o '%i'|wc -l` - 1))
 
 maxAllowJobNum=$(( $maxJobNum - $numOfJobsInMagnus ))
 
@@ -93,50 +97,84 @@ maxAllowJobNum=$(( $maxJobNum - $numOfJobsInMagnus ))
 
 slurmScript="${scriptDir}/.submitArray.slm"
 
-reqNumJob=$(( $end - $start + 1 ))
-if [ $reqNumJob -gt $maxAllowJobNum ]; then
-	if [ $maxAllowJobNum -gt 1 ]; then
-		newEnd=$(( $start + $maxAllowJobNum - 1 ))
-		if [ $end -lt $newEnd ]; then
-			newEnd=$end
+
+
+# When the require number of jobs is equal or less than max allowable job
+if [ $maxAllowJobNum -gt 1 ]; then
+	newEnd=$(( $start + $maxAllowJobNum - 1 ))
+	if [ $end -lt $newEnd ]; then
+		newEnd=$end
+	fi
+
+
+	if [ ${start} -ge ${maxArraySize} ] || [ ${newEnd} -ge ${maxArraySize} ]; then
+
+		startArrayBatch=$(( ${start}  / ${maxArraySize} ))
+		newEndArrayBatch=$(( ${newEnd}  / ${maxArraySize} ))
+		# make sure start and newEnd are in the same array batch
+		if [ ${startArrayBatch} != ${newEndArrayBatch} ]; then
+			newEnd=$(( ( $maxArraySize * ($startArrayBatch + 1) ) - 1))
 		fi
-		cmd="sbatch --array=$start-$newEnd ${otherOptions} $script"
-		echo "$cmd";
-		jobID=`$cmd`; jobID=${jobID##* };
 
-		# keep a submitted record in .{script}_nextRun
-		newStart=$(( $newEnd + 1 ))
+		modStart=$(( ${start} % ${maxArraySize} ))
+		modNewEnd=$(( ${newEnd} % ${maxArraySize} ))
 
+		sed -e "s/\$SLURM_ARRAY_TASK_ID/\$((\$SLURM_ARRAY_TASK_ID + ( ${maxArraySize} * ${startArrayBatch} ) ))/g" \
+				-e "s/\${SLURM_ARRAY_TASK_ID}/\$((\$SLURM_ARRAY_TASK_ID + ( ${maxArraySize} * ${startArrayBatch} ) ))/g" \
+				-e "s/%a/${startArrayBatch}_%a/g" ${script} > ${modScript}
+
+	else
+		modStart=$start
+		modNewEnd=$newEnd
+		modScript="${script}"
+	fi
+
+
+	cmd="sbatch --array=$modStart-$modNewEnd ${otherOptions} $modScript"
+	echo "$cmd";
+	jobID=`$cmd`; jobID=${jobID##* };
+
+
+	# keep a submitted record in .{script}_nextRun
+	newStart=$(( $newEnd + 1 ))
+
+	if [ $newStart -le $end ]; then
+		# if still have some left over, generate the next run required info and submit a monitor job
 		echo -e "${newStart}\n${end}\n${otherOptions}\n${script}" > $scriptNext
 
 		# submit this script: sbatch --dependency=after:${jobID} $thisScript 
 
-		thisScript="$( which "${0}" )";
-		if [ -L ${thisScript} ]; then
-				thisScript=$( readlink ${thisScript} );
+		thisScript_tmp="$( which "${0}" )";
+		if [ "$?" -eq "1" ]; then
+			thisScript=${0}
+		elif [ -L ${thisScript_tmp} ]; then
+			thisScript=$( readlink ${thisScript_tmp} );
+			if [ "${thisScript:0:1}" == "." ]; then
+				thisScript="`dirname ${thisScript_tmp}`/${thisScript}";
 			fi
+		else
+			thisScript=${thisScript_tmp};
+		fi
 		thisScriptDir="$( dirname ${thisScript} )"
+
+
 		slurmTemplate="${thisScriptDir}/TEMPLATES/submitArray.TEMPLATE"
 
 		sed -e "s|_SCRIPT_|$script|" < ${slurmTemplate} > ${slurmScript}
 		cmd="sbatch --dependency=after:${jobID} ${slurmScript}"
 		echo "$cmd"
 		eval $cmd;
-
 	else
-		# throw error
-		echo "ERROR: Your job queue is full. Consider submitting it again when some of your jobs are finished.">&2; exit 1;
+		# do the clean up
+		if [ -f "$scriptNext" ];then
+			rm $scriptNext
+		fi
+		if [ -f "$slurmScript" ];then
+			rm $slurmScript
+		fi
 	fi
-else
-  # direct submission
-	cmd="sbatch --array=${start}-${end} ${otherOptions} ${script}"
-	echo "$cmd"
-	eval $cmd
 
-	if [ -f "$scriptNext" ];then
-		rm $scriptNext
-	fi
-	if [ -f "$slurmScript" ];then
-		rm $slurmScript
-	fi
+else
+	# throw error
+	echo "ERROR: Your job queue is full. Consider submitting it again when some of your jobs are finished.">&2; exit 1;
 fi

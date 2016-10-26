@@ -1,0 +1,39 @@
+#!/bin/bash
+
+# Kenneth Chan, v0.1 (2016-04-11): This is a script template file for raijin cluster to be modified by runJobs.sh 
+#	Copyright statement: Copyright (c) 2016 Applied Bioinformatics Group, UWA, Perth WA, Australia
+
+
+thisConfig='_CONFIG_FILE_'
+if [ -e $thisConfig ]; then
+	. $thisConfig
+else
+	echo "ERROR in job ${jobIDLabel}: Config file does not exist - $thisConfig" 1>&2; exit 1;
+fi
+
+
+if [ ! -z $1 ]; then
+	fileIndex=$1
+	jobIDLabel="${fileIndex}"
+	thisJobID="${PBS_JOBID}"
+else
+	echo "`date` ERROR: No file index is given as argument">&2; exit 1;
+fi
+
+
+thisOutDir="_OUT_DIR_/${fileIndex}"
+
+if [ ! -d $thisOutDir ]; then
+	mkdir -p $thisOutDir;
+fi
+
+
+cd $thisOutDir
+echo "`date` Start job ${jobIDLabel} in raijin: $PROG ${OPTION_ARG[$fileIndex]}"
+
+
+eval "$PROG ${OPTION_ARG[$fileIndex]}"
+
+progExitStatus=$?;
+echo "`date`: Finish job ${jobIDLabel}, ExitStatus: $progExitStatus"
+

@@ -1,0 +1,40 @@
+#!/bin/bash -l
+
+
+# Kenneth Chan, v0.1 (2016-04-11): This is a pbs template file to be modified by runJobs.sh 
+# Copyright statement: Copyright (c) 2016 Applied Bioinformatics Group, UWA, Perth WA, Australia
+
+
+#PBS -N _JOB_NAME_
+#PBS -q _NODETYPE_
+#PBS -l ncpus=_TOTAL-CPU_
+#PBS -l mem=_TOTAL-MEM_
+#PBS -l walltime=_HR_:00:00
+#PBS -A _ACCOUNT_
+
+
+#PBS -o _OUTPUT_LOG_
+#PBS -e _ERROR_LOG_
+
+
+export OMP_NUM_THREADS=_OMP_CPU_
+
+echo "========================================="
+
+_CUSTOMISE_
+
+_MODULES_
+
+module load parallel
+
+outLog="_OUTPUT_LOG_"
+
+jobLog="`dirname $outLog`/parallel_raijin_${PBS_JOBID}.log"
+parallel="parallel --delay 1 -j _TOTAL-CPU_ --joblog ${jobLog} --resume"
+
+outLog="${outLog%.*}.${PBS_JOBID}.log"
+echo "$parallel \" _RUN_PE_WRAPPER_ {1} > ${outLog}.{1}\" ::: {_START_.._END_}"
+$parallel " _RUN_PE_WRAPPER_ {1} > ${outLog}.{1}" ::: {_START_.._END_}
+
+echo "========================================="
+

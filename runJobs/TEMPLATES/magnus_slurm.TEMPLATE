@@ -12,13 +12,22 @@
 #SBATCH --ntasks=24
 #SBATCH --ntasks-per-node=24
 #SBATCH --time=_HR_:00:00
-#SBATCH --partition=workq
+#SBATCH --partition=_NODETYPE_
 #SBATCH --account=_ACCOUNT_
 
 #SBATCH --output=_OUTPUT_LOG_
 #SBATCH --error=_ERROR_LOG_
 
-#SBATCH --export=ALL 
+#SBATCH --export=NONE 
+. /group/pawsey0149/groupEnv/ivec/groupResource.cfg
+
+
+export OMP_NUM_THREADS=_OMP_CPU_
+
+_CUSTOMISE_
+
+_MODULES_
+
 
 echo "========================================="
 echo "SLURM_JOB_ID = $SLURM_JOB_ID"
@@ -31,13 +40,13 @@ if [ ! -z $SLURM_ARRAY_TASK_ID ]; then
 	lastArrayNumOfTask=_LAST_NTASK_
 
 	if [ "$maxArrayIndex" -eq "$SLURM_ARRAY_TASK_ID" ]; then
-		aprun -n _LAST_NTASK_ -N _LAST_NTASK_ bash -l _RUN_PE_WRAPPER_ $SLURM_ARRAY_TASK_ID _NUM-OF-TASK_ 
+		aprun -n _LAST_NTASK_ -N _LAST_NTASK_ -d _OMP_CPU_ bash -l _RUN_PE_WRAPPER_ $SLURM_ARRAY_TASK_ID _NUM-OF-TASK_ 
 	else
-		aprun -n _NUM-OF-TASK_ -N _NUM-OF-TASK_ bash -l _RUN_PE_WRAPPER_ $SLURM_ARRAY_TASK_ID _NUM-OF-TASK_ 
+		aprun -n _NUM-OF-TASK_ -N _NUM-OF-TASK_ -d _OMP_CPU_ bash -l _RUN_PE_WRAPPER_ $SLURM_ARRAY_TASK_ID _NUM-OF-TASK_ 
 	fi
 
 else
-	aprun -n _NUM-OF-TASK_ -N _NUM-OF-TASK_ bash -l _RUN_PE_WRAPPER_ 
+	aprun -n _NUM-OF-TASK_ -N _NUM-OF-TASK_ -d _OMP_CPU_ bash -l _RUN_PE_WRAPPER_ 
 fi
 echo "========================================="
 

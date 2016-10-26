@@ -22,10 +22,23 @@ HOUR=
 #  example 2: OUT_DIR='/scratch/y82/kchan/proj/noFilterResult'   
 OUT_DIR=
 
+
+# Customised inserting code into slurm - useful for switching to a different environment
+# eg. CUSTOMISE="module swap PrgEnv-cray/5.2.82 PrgEnv-gnu/5.2.82"
+CUSTOMISE=
+
+# Modules to be loaded
+# eg. MODULES=(
+#       blast+
+#       samtools/0.1.19 )
+MODULES=(
+)
+
 # The fixed part of the run, eg. program/script name and the unchanged options
 #  example 1. PROG='python myscript1.py'
 #  example 2. PROG='python myscript1.py -o /scratch/y82/kchan/testOut'
 PROG=
+
 
 # The variation part of the run, eg. options and arguments for the program
 #  must be an array, each option needs to be inside a single or double quote

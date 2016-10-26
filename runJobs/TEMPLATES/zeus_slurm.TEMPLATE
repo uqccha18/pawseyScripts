@@ -1,0 +1,47 @@
+#!/bin/bash -l
+
+
+# Kenneth Chan, v0.1 (2015-11-19): This is a slurm template file to be modified by runJobs.sh 
+# Copyright statement: Copyright (c) 2015 Applied Bioinformatics Group, UWA, Perth WA, Australia
+
+
+#SBATCH --job-name=_JOB_NAME_
+#SBATCH --nodes=1
+#SBATCH --ntasks=_NUM-OF-TASK_
+#SBATCH --cpus-per-task=_OMP_CPU_
+#SBATCH --time=_HR_:00:00
+#SBATCH --partition=_NODETYPE_
+#SBATCH --account=_ACCOUNT_
+#SBATCH --mem=_MEM_
+
+
+#SBATCH --output=_OUTPUT_LOG_
+#SBATCH --error=_ERROR_LOG_
+
+#SBATCH --export=NONE 
+. /group/pawsey0149/groupEnv/ivec/groupResource.cfg
+
+export OMP_NUM_THREADS=_OMP_CPU_
+
+echo "========================================="
+echo "SLURM_JOB_ID = $SLURM_JOB_ID"
+echo "SLURM_NODELIST = $SLURM_NODELIST"
+
+_CUSTOMISE_
+
+_MODULES_
+
+module load parallel
+
+
+outLog="_OUTPUT_LOG_"
+
+jobLog="`dirname ${outLog}`/parallel_zeus_${SLURM_JOB_ID}.log"
+parallel="parallel --delay 1 -j $SLURM_NTASKS --joblog ${jobLog} --resume"
+
+outLog="${outLog%.*}.${SLURM_JOB_ID}.log"
+echo "$parallel \"_RUN_PE_WRAPPER_ {1} > ${outLog}.{1}\" ::: {_START_.._END_}"
+$parallel "_RUN_PE_WRAPPER_ {1} > ${outLog}.{1}" ::: {_START_.._END_}
+
+echo "========================================="
+

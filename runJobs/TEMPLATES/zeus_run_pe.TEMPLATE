@@ -1,0 +1,82 @@
+#!/bin/bash
+
+# Kenneth Chan, v0.1 (2015-11-19): This is a script template file for zeus cluster to be modified by runJobs.sh 
+#	Copyright statement: Copyright (c) 2015 Applied Bioinformatics Group, UWA, Perth WA, Australia
+
+
+##### Default settings 
+
+# Start printing out the max memory used if the job is going to end this time, unit in minutes
+MinPrintBeforeDie=2
+# For recording max memory used the job, unit in seconds
+probeInterval=_PROBE_INTERVAL_
+check_mem=_IS_CHECK_MEM_
+
+######################
+
+
+thisConfig='_CONFIG_FILE_'
+if [ -e $thisConfig ]; then
+	. $thisConfig
+else
+	echo "ERROR in job ${jobIDLabel}: Config file does not exist - $thisConfig" 1>&2; exit 1;
+fi
+
+
+if [ ! -z $1 ]; then
+	fileIndex=$1
+	jobIDLabel="${fileIndex}"
+	thisJobID="${SLURM_JOB_ID}"
+else
+	echo "`date` ERROR: No file index is given as argument">&2; exit 1;
+fi
+
+
+thisOutDir="_OUT_DIR_/${fileIndex}"
+
+if [ ! -d $thisOutDir ]; then
+	mkdir -p $thisOutDir;
+fi
+
+
+cd $thisOutDir
+echo "`date` Start job ${jobIDLabel} in zeus: $PROG ${OPTION_ARG[$fileIndex]}"
+
+
+if [ "$check_mem" == "0" ]; then
+	eval "$PROG ${OPTION_ARG[$fileIndex]}"
+	progExitStatus=$?;
+  echo "`date`: Finish job ${jobIDLabel}, ExitStatus: $progExitStatus"
+else
+  eval "($PROG ${OPTION_ARG[$fileIndex]}) &"
+  thisPID=$!;
+  
+  sys95pcMem=`free -m |sed -n '2p' | awk '{print int ($2*0.95)}'`;
+  maxMem=0
+  while ps -p ${thisPID} > /dev/null
+  do
+  	curmem=`free -m |sed -n '2p' | awk '{print $3}';`
+  	if [ "$maxMem" -lt "$curmem" ]; then maxMem=$curmem; fi
+  	# If the job dies, we will still get some info about the memory usage
+  	if [ "$maxMem" -gt "$sys95pcMem" ]; then
+  		echo "`date`: Reach >95% ($sys95pcMem MB) of sysMem, CurrentMemUsed: $maxMem MB"
+  	fi
+  
+  	# If the job is going to end soon, print out the current memory usage
+  	timeLeft=`squeue -j ${thisJobID} -o %L | tail -n 1`;
+  	if [[ "${timeLeft}" =~ ^([0-9][0-9]):[0-9][0-9]$ ]]; then
+  		curMin=${BASH_REMATCH[1]}
+  		if [ $curMin -le $MinPrintBeforeDie ]; then
+  			echo "`date`: $curMin min left, CurrentMemUsed: $maxMem MB"
+  		fi
+  	fi
+  
+  	sleep $probeInterval
+  done
+  
+  wait ${thisPID}
+  progExitStatus=$?;
+  
+  echo "`date`: Finish job ${jobIDLabel}, MaxMemUsed: $maxMem MB, ExitStatus: $progExitStatus"
+fi
+
